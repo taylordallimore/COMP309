@@ -40,6 +40,9 @@ for df in df_list:
     filename = f"{genre_name}_mod.csv"
     #filename = f"test_mod.csv"
     df.to_csv(filename, index=False)
+    
+
+
 
 alternative_mod = pd.read_csv('alternative_mod.csv')
 blues_mod = pd.read_csv('blues_mod.csv')
@@ -58,10 +61,6 @@ test_mod = pd.read_csv('test_mod.csv')
 
 df_list_imputed = [alternative_mod, blues_mod, childrens_mod, comedy_mod, electronic_mod, folk_mod, hiphop_mod, movie_mod, ska_mod, soul_mod]
 #df_list_imputed = [test_mod]
-
-
-
-
 # uncomment if you want to create all data
 df_csv_concat = pd.concat(df_list_imputed, ignore_index=True)
 df_csv_concat.to_csv('training-data/alldata.csv', index=False)
@@ -73,7 +72,13 @@ alldata = pd.read_csv('training-data/alldata.csv')
 
 #PREPARING DATA
 
-good_data = alldata.drop(['track_id', 'track_name', 'artist_name', 'time_signature', 'instrumentalness', 'instance_id'], axis=1)
+good_data = alldata.drop(['track_id', 'track_name', 'artist_name', 'instance_id'], axis=1)
+#good_data = good_data[good_data['instrumentalness'] != 0]
+
+time_signature_encoder = LabelEncoder()
+good_data['time_signature_encoded'] = time_signature_encoder.fit_transform(good_data['time_signature'])
+
+
 
 # Create a LabelEncoder for the "key" column
 key_encoder = LabelEncoder()
@@ -84,8 +89,7 @@ mode_encoder = LabelEncoder()
 good_data['mode_encoded'] = mode_encoder.fit_transform(good_data['mode'])
 
 # Drop the original "key" and "mode" columns if needed
-data = good_data.drop(columns=['key', 'mode'])
-
+data = good_data.drop(columns=['key', 'mode', 'time_signature'])
 
 # data.replace('?', np.nan, inplace=True)
 data.to_csv('training-data/encoded_data.csv', index=False)
