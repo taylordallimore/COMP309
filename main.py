@@ -25,22 +25,14 @@ testing = pd.read_csv('test-data/testing.csv')
 #df_list = [testing]
 df_list = [alternative, blues, childrens, comedy, electronic, folk, hiphop, movie, ska, soul]
 
+# if colum contains -1, drop the instance
 for df in df_list:
-    # Process 'duration_ms'
-    average_duration = df[df['duration_ms'] != -1]['duration_ms'].mean()
-    genre_name = df['genre'].iloc[0]
-    df['duration_ms'].replace(-1, average_duration, inplace=True)
+    df.drop(df[df['duration_ms'] == -1].index, inplace=True)
+    df.drop(df[df['tempo'] == "?"].index, inplace=True)
+    df.drop(df[df['popularity'] == 0].index, inplace=True)
     
-    # Process 'tempo'
-    df['tempo'] = pd.to_numeric(df['tempo'], errors='coerce')
-    average_tempo = df['tempo'].mean()
-    df['tempo'].fillna(average_tempo, inplace=True)
+#df.to_csv('training-data/filtered_data.csv', index=False)
     
-    # Save the modified DataFrame as a CSV file with genre-specific name
-    filename = f"{genre_name}_mod.csv"
-    #filename = f"test_mod.csv"
-    df.to_csv(filename, index=False)
-
 alternative_mod = pd.read_csv('alternative_mod.csv')
 blues_mod = pd.read_csv('blues_mod.csv')
 childrens_mod = pd.read_csv("Children's Music_mod.csv")
@@ -51,29 +43,20 @@ hiphop_mod = pd.read_csv('hip-hop_mod.csv')
 movie_mod = pd.read_csv('movie_mod.csv')
 ska_mod = pd.read_csv('ska_mod.csv')
 soul_mod = pd.read_csv('soul_mod.csv')
-
 test_mod = pd.read_csv('test_mod.csv')
 
-
-
 df_list_imputed = [alternative_mod, blues_mod, childrens_mod, comedy_mod, electronic_mod, folk_mod, hiphop_mod, movie_mod, ska_mod, soul_mod]
-#df_list_imputed = [test_mod]
+df_csv_concat = pd.concat(df_list, ignore_index=True)
 
 
-
-
-# uncomment if you want to create all data
-df_csv_concat = pd.concat(df_list_imputed, ignore_index=True)
 df_csv_concat.to_csv('training-data/alldata.csv', index=False)
 alldata = pd.read_csv('training-data/alldata.csv')
-
-# profile = ProfileReport(alldata)
-# profile.to_file(output_file='alldata.html', )
+good_data = alldata.drop(['track_id', 'track_name', 'artist_name', 'instance_id'], axis=1)
 
 
-#PREPARING DATA
+time_signature_encoder = LabelEncoder()
+good_data['time_signature_encoded'] = time_signature_encoder.fit_transform(good_data['time_signature'])
 
-good_data = alldata.drop(['track_id', 'track_name', 'artist_name', 'time_signature', 'instrumentalness', 'instance_id'], axis=1)
 
 # Create a LabelEncoder for the "key" column
 key_encoder = LabelEncoder()
@@ -84,10 +67,10 @@ mode_encoder = LabelEncoder()
 good_data['mode_encoded'] = mode_encoder.fit_transform(good_data['mode'])
 
 # Drop the original "key" and "mode" columns if needed
-data = good_data.drop(columns=['key', 'mode'])
+data = good_data.drop(columns=['key', 'mode', 'time_signature'])
 
 
-# data.replace('?', np.nan, inplace=True)
+# # data.replace('?', np.nan, inplace=True)
 data.to_csv('training-data/encoded_data.csv', index=False)
 
 
@@ -131,8 +114,8 @@ data.to_csv('training-data/encoded_data.csv', index=False)
 # print("Genre Counts for Rows with instrumentalness = 0:")
 # print(genre_counts)
 
-good_data.to_csv('training-data/good_data.csv', index=False)
-print(good_data.head())
+# good_data.to_csv('training-data/good_data.csv', index=False)
+# print(good_data.head())
 
 
 
