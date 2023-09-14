@@ -1,12 +1,14 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import stats
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 from ydata_profiling import ProfileReport
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.impute import SimpleImputer
 
 # load in data and create all data
 alternative = pd.read_csv('training-data/alternative.csv')
@@ -20,134 +22,85 @@ movie = pd.read_csv('training-data/movie.csv')
 ska = pd.read_csv('training-data/ska.csv')
 soul = pd.read_csv('training-data/soul.csv')
 
-testing = pd.read_csv('test-data/testing.csv')
-
-#df_list = [testing]
 df_list = [alternative, blues, childrens, comedy, electronic, folk, hiphop, movie, ska, soul]
-
-for df in df_list:
-    # Process 'duration_ms'
-    average_duration = df[df['duration_ms'] != -1]['duration_ms'].mean()
-    genre_name = df['genre'].iloc[0]
-    df['duration_ms'].replace(-1, average_duration, inplace=True)
-    
-    # Process 'tempo'
-    df['tempo'] = pd.to_numeric(df['tempo'], errors='coerce')
-    average_tempo = df['tempo'].mean()
-    df['tempo'].fillna(average_tempo, inplace=True)
-    
-    # Save the modified DataFrame as a CSV file with genre-specific name
-    filename = f"{genre_name}_mod.csv"
-    #filename = f"test_mod.csv"
-    df.to_csv(filename, index=False)
-    
-
-
-
-alternative_mod = pd.read_csv('alternative_mod.csv')
-blues_mod = pd.read_csv('blues_mod.csv')
-childrens_mod = pd.read_csv("Children's Music_mod.csv")
-comedy_mod = pd.read_csv('comedy_mod.csv')
-electronic_mod = pd.read_csv('electronic_mod.csv')
-folk_mod = pd.read_csv('folk_mod.csv')
-hiphop_mod = pd.read_csv('hip-hop_mod.csv')
-movie_mod = pd.read_csv('movie_mod.csv')
-ska_mod = pd.read_csv('ska_mod.csv')
-soul_mod = pd.read_csv('soul_mod.csv')
-
-test_mod = pd.read_csv('test_mod.csv')
-
-
-
-df_list_imputed = [alternative_mod, blues_mod, childrens_mod, comedy_mod, electronic_mod, folk_mod, hiphop_mod, movie_mod, ska_mod, soul_mod]
-#df_list_imputed = [test_mod]
-# uncomment if you want to create all data
-df_csv_concat = pd.concat(df_list_imputed, ignore_index=True)
+df_csv_concat = pd.concat(df_list, ignore_index=True)
 df_csv_concat.to_csv('training-data/alldata.csv', index=False)
-alldata = pd.read_csv('training-data/alldata.csv')
+all_data = pd.read_csv('training-data/alldata.csv')
 
-# profile = ProfileReport(alldata)
-# profile.to_file(output_file='alldata.html', )
+#------------DROP IRRELEVANT-----------------
+all_data = all_data.drop(columns=['track_id', 'track_name', 'artist_name', 'instance_id'])
+
+#------------IMPUTE THE DATA-----------------
+imputer = SimpleImputer(strategy="mean")
+all_data['tempo'] = all_data['tempo'].replace('?', np.nan)
+all_data['tempo'] = pd.to_numeric(all_data['tempo'], errors='coerce')
+all_data['duration_ms'] = all_data['duration_ms'].replace(-1, np.nan)
+all_data['popularity'] = all_data['popularity'].replace(0, np.nan)
+all_data['tempo'] = imputer.fit_transform(all_data['tempo'].values.reshape(-1, 1))
+all_data['duration_ms'] = imputer.fit_transform(all_data['duration_ms'].values.reshape(-1, 1))
+all_data['popularity'] = imputer.fit_transform(all_data['popularity'].values.reshape(-1, 1))
+all_data['instrumentalness'] = all_data['instrumentalness'].replace(0, np.nan)
+all_data['instrumentalness'] = imputer.fit_transform(all_data['instrumentalness'].values.reshape(-1, 1))
+
+#------------SCALE THE DATA-----------------
+scaler = MinMaxScaler()
+numerical_columns = ['popularity', 'acousticness', 'danceability',
+       'duration_ms', 'energy', 'instrumentalness', 'liveness',
+       'loudness', 'speechiness', 'tempo',
+       'valence']
+all_data[numerical_columns] = scaler.fit_transform(all_data[numerical_columns])
+
+#------------ENCODE THE DATA-----------------
+label_encoder_mode = LabelEncoder()
+label_encoder_time_signature = LabelEncoder()
+label_encoder_key = LabelEncoder()
+all_data['mode'] = label_encoder_mode.fit_transform(all_data['mode'])
+all_data['time_signature'] = label_encoder_time_signature.fit_transform(all_data['time_signature'])
+all_data['key'] = label_encoder_key.fit_transform(all_data['key'])
+
+all_data.to_csv('training-data/alldata_notempo.csv', index=False)
 
 
-#PREPARING DATA
 
-good_data = alldata.drop(['track_id', 'track_name', 'artist_name', 'instance_id'], axis=1)
-#good_data = good_data[good_data['instrumentalness'] != 0]
+# import pandas as pd
+# import numpy as np
+# from scipy import stats
+# from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+# from sklearn.impute import SimpleImputer
 
-time_signature_encoder = LabelEncoder()
-good_data['time_signature_encoded'] = time_signature_encoder.fit_transform(good_data['time_signature'])
+# # Load your data
+# all_data = pd.read_csv('training-data/alldata.csv')
 
+# # Define the numerical columns
+# numerical_columns = ['popularity', 'acousticness', 'danceability',
+#                      'duration_ms', 'energy', 'instrumentalness', 'key', 'liveness',
+#                      'loudness', 'mode', 'speechiness', 'tempo', 'time_signature',
+#                      'valence']
 
+# # Replace non-numeric values (e.g., '?') with NaN
+# all_data[numerical_columns] = all_data[numerical_columns].apply(pd.to_numeric, errors='coerce')
 
-# Create a LabelEncoder for the "key" column
-key_encoder = LabelEncoder()
-good_data['key_encoded'] = key_encoder.fit_transform(good_data['key'])
+# # Identify and handle outliers using z-scores
+# z_scores = np.abs(stats.zscore(all_data[numerical_columns]))
+# outlier_threshold = 3  # Adjust this threshold as needed
+# outlier_mask = (z_scores > outlier_threshold).any(axis=1)
+# all_data_clean = all_data[~outlier_mask]
 
-# Create a LabelEncoder for the "mode" column
-mode_encoder = LabelEncoder()
-good_data['mode_encoded'] = mode_encoder.fit_transform(good_data['mode'])
+# # Impute missing values (you can adjust the imputation strategy as needed)
+# imputer = SimpleImputer(strategy="mean")
+# all_data_clean[numerical_columns] = imputer.fit_transform(all_data_clean[numerical_columns])
 
-# Drop the original "key" and "mode" columns if needed
-data = good_data.drop(columns=['key', 'mode', 'time_signature'])
+# # Encode categorical variables
+# label_encoder_mode = LabelEncoder()
+# label_encoder_time_signature = LabelEncoder()
+# label_encoder_key = LabelEncoder()
+# all_data_clean['mode'] = label_encoder_mode.fit_transform(all_data_clean['mode'])
+# all_data_clean['time_signature'] = label_encoder_time_signature.fit_transform(all_data_clean['time_signature'])
+# all_data_clean['key'] = label_encoder_key.fit_transform(all_data_clean['key'])
 
-# data.replace('?', np.nan, inplace=True)
-data.to_csv('training-data/encoded_data.csv', index=False)
-
-
-
-# #Select only the numeric columns for scaling (exclude 'genre')
-# numeric_columns = data.select_dtypes(include=['int64', 'float64']).columns
-# print(numeric_columns)
-# # Create a MinMaxScaler instance
+# # Scale the data
 # scaler = MinMaxScaler()
-# # Fit the MinMaxScaler on the numeric columns in X
-# scaler.fit(data[numeric_columns])
-# # Transform the numeric columns in X using the fitted scaler
-# data[numeric_columns] = scaler.transform(data[numeric_columns])
-# # Display the updated DataFrame
-# print(data.head())
+# all_data_clean[numerical_columns] = scaler.fit_transform(all_data_clean[numerical_columns])
 
-
-
-
-
-
-
-
-# filtered_data = data[data['instrumentalness'] == 0]
-# filtered_data.to_csv('training-data/filtered_data.csv', index=False)
-# # Count the occurrences of each genre in the filtered DataFrame
-# genre_counts = filtered_data['genre'].value_counts()
-
-# # Print the genre counts
-# print("Genre Counts for Rows with instrumentalness = 0:")
-# print(genre_counts)
-
-# ------- CHECKING INSTRUMENTALNESS ------------------------------
-
-# filtered_data = alldata[alldata['instrumentalness'] == 0]
-# filtered_data.to_csv('training-data/filtered_data.csv', index=False)
-# # Count the occurrences of each genre in the filtered DataFrame
-# genre_counts = filtered_data['genre'].value_counts()
-
-# # Print the genre counts
-# print("Genre Counts for Rows with instrumentalness = 0:")
-# print(genre_counts)
-
-good_data.to_csv('training-data/good_data.csv', index=False)
-print(good_data.head())
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# # Save the cleaned data
+# all_data_clean.to_csv('training-data/alldata_cleaned.csv', index=False)
