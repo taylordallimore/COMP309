@@ -7,6 +7,10 @@ from sklearn.tree import DecisionTreeClassifier
 from ydata_profiling import ProfileReport
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.impute import KNNImputer, SimpleImputer
+from ydata_profiling import ProfileReport
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 # load in data and create all data
 alternative = pd.read_csv('training-data/alternative.csv')
@@ -65,85 +69,79 @@ df_list_imputed = [alternative_mod, blues_mod, childrens_mod, comedy_mod, electr
 # uncomment if you want to create all data
 df_csv_concat = pd.concat(df_list_imputed, ignore_index=True)
 df_csv_concat.to_csv('training-data/alldata.csv', index=False)
-alldata = pd.read_csv('training-data/alldata.csv')
-
-# profile = ProfileReport(alldata)
-# profile.to_file(output_file='alldata.html', )
-
-
-#PREPARING DATA
-
-good_data = alldata.drop(['track_id', 'track_name', 'artist_name', 'time_signature', 'instrumentalness', 'instance_id'], axis=1)
-
-# Create a LabelEncoder for the "key" column
-key_encoder = LabelEncoder()
-good_data['key_encoded'] = key_encoder.fit_transform(good_data['key'])
-
-# Create a LabelEncoder for the "mode" column
-mode_encoder = LabelEncoder()
-good_data['mode_encoded'] = mode_encoder.fit_transform(good_data['mode'])
-
-# Drop the original "key" and "mode" columns if needed
-data = good_data.drop(columns=['key', 'mode'])
-
-
-# data.replace('?', np.nan, inplace=True)
-data.to_csv('training-data/encoded_data.csv', index=False)
+all_data = pd.read_csv('training-data/alldata.csv')
+# profile = ProfileReport(all_data, title="Profiling Report")
+# profile.to_file("report.html")
 
 
 
-# #Select only the numeric columns for scaling (exclude 'genre')
-# numeric_columns = data.select_dtypes(include=['int64', 'float64']).columns
-# print(numeric_columns)
-# # Create a MinMaxScaler instance
-# scaler = MinMaxScaler()
-# # Fit the MinMaxScaler on the numeric columns in X
-# scaler.fit(data[numeric_columns])
-# # Transform the numeric columns in X using the fitted scaler
-# data[numeric_columns] = scaler.transform(data[numeric_columns])
-# # Display the updated DataFrame
-# print(data.head())
+#------------REMOVE OUTLIERS-----------------
+columns_to_check = ['popularity', 'acousticness', 'danceability', 'duration_ms',
+                    'energy', 'instrumentalness', 'liveness','loudness', 
+                    'speechiness','valence' ] 
+def detect_outliers_zscore(data, columns, threshold=2):
+    z_scores = np.abs((data[columns] - data[columns].mean()) / data[columns].std())
+    return z_scores > threshold
+outliers = detect_outliers_zscore(all_data, columns_to_check)
+print(all_data[outliers.any(axis=1)])
+# plt.figure(figsize=(12, 6))
+# plt.boxplot(all_data[columns_to_check], vert=False)
+# plt.xticks(range(1, len(columns_to_check) + 1), columns_to_check, rotation=45)
+# plt.xlabel('Columns')
+# plt.ylabel('Values')
+# plt.title('Boxplots of Columns with Outliers')
+# plt.show()
+#------------DROP IRRELEVANT-----------------
+all_data = all_data.drop(columns=['track_id', 'track_name', 'artist_name', 'instance_id'])
+
+#------------IMPUTE THE DATA-----------------
+# imputer = SimpleImputer(strategy="mean")
+# all_data['tempo'] = all_data['tempo'].replace('?', np.nan)
+# all_data['tempo'] = pd.to_numeric(all_data['tempo'], errors='coerce')
+# all_data['duration_ms'] = all_data['duration_ms'].replace(-1, np.nan)
+# all_data['popularity'] = all_data['popularity'].replace(0, np.nan)
+# all_data['tempo'] = imputer.fit_transform(all_data['tempo'].values.reshape(-1, 1))
+# all_data['duration_ms'] = imputer.fit_transform(all_data['duration_ms'].values.reshape(-1, 1))
+# all_data['popularity'] = imputer.fit_transform(all_data['popularity'].values.reshape(-1, 1))
+# all_data['instrumentalness'] = all_data['instrumentalness'].replace(0, np.nan)
+# all_data['instrumentalness'] = imputer.fit_transform(all_data['instrumentalness'].values.reshape(-1, 1))
+
+# Define a function for KNN imputation
+def knn_impute_columns(data, columns_to_impute, k_neighbors=5):
+    imputed_data = data.copy()
+    imputed_data[columns_to_impute] = imputed_data[columns_to_impute].replace('?', np.nan)
+    imputed_data[columns_to_impute] = imputed_data[columns_to_impute].replace(-1, np.nan)
+    imputed_data[columns_to_impute] = imputed_data[columns_to_impute].replace(0, np.nan)
+    knn_imputer = KNNImputer(n_neighbors=k_neighbors)
+    imputed_data[columns_to_impute] = knn_imputer.fit_transform(imputed_data[columns_to_impute])
+    return imputed_data
+
+columns_to_impute = ['tempo', 'duration_ms', 'popularity', 'instrumentalness']
+k_neighbors = 5  
+all_data = knn_impute_columns(all_data, columns_to_impute, k_neighbors)
+
+#------------SCALE THE DATA-----------------
+scaler = MinMaxScaler()
+numerical_columns = ['popularity', 'acousticness', 'danceability',
+       'duration_ms', 'energy', 'instrumentalness', 'liveness',
+       'loudness', 'speechiness', 'tempo', 'valence']
+all_data[numerical_columns] = scaler.fit_transform(all_data[numerical_columns])
+
+#------------ENCODE THE DATA-----------------
+label_encoder_mode = LabelEncoder()
+label_encoder_time_signature = LabelEncoder()
+label_encoder_key = LabelEncoder()
+all_data['mode'] = label_encoder_mode.fit_transform(all_data['mode'])
+all_data['time_signature'] = label_encoder_time_signature.fit_transform(all_data['time_signature'])
+all_data['key'] = label_encoder_key.fit_transform(all_data['key'])
 
 
+# all_data = pd.get_dummies(all_data, columns=['genre'], prefix='genre')
+# correlations = all_data.corr()
+# plt.figure(figsize=(10, 6))
+# sns.heatmap(correlations, cmap='coolwarm', annot=True, linewidths=.5)
+# plt.title('Correlation Heatmap: Features vs. Encoded Genres')
+# plt.show()
 
-
-
-
-
-
-# filtered_data = data[data['instrumentalness'] == 0]
-# filtered_data.to_csv('training-data/filtered_data.csv', index=False)
-# # Count the occurrences of each genre in the filtered DataFrame
-# genre_counts = filtered_data['genre'].value_counts()
-
-# # Print the genre counts
-# print("Genre Counts for Rows with instrumentalness = 0:")
-# print(genre_counts)
-
-# ------- CHECKING INSTRUMENTALNESS ------------------------------
-
-# filtered_data = alldata[alldata['instrumentalness'] == 0]
-# filtered_data.to_csv('training-data/filtered_data.csv', index=False)
-# # Count the occurrences of each genre in the filtered DataFrame
-# genre_counts = filtered_data['genre'].value_counts()
-
-# # Print the genre counts
-# print("Genre Counts for Rows with instrumentalness = 0:")
-# print(genre_counts)
-
-good_data.to_csv('training-data/good_data.csv', index=False)
-print(good_data.head())
-
-
-
-
-
-
-
-
-
-
-
-
-
+all_data.to_csv('training-data/alldata_notempo.csv', index=False)
 
